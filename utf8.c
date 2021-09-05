@@ -119,7 +119,7 @@ utf8_insert(char* dest, const size_t rune_index, const char* src)
 }
 
 char*
-utf8_remove_rune(char* dest, const size_t rune_index, const size_t rune_count)
+utf8_remove(char* dest, const size_t rune_index, const size_t rune_count)
 {
 	if (rune_count < 1) {
 		return dest;

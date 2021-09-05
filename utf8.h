@@ -45,4 +45,4 @@ char* utf8_insert(char* dest, const size_t rune_index, const char* src);
  * Removes a given count of UTF8 runes from dest starting from the given index.
  * Automatically resizes dest and returns it.
  */
-char* utf8_remove_rune(char* dest, const size_t rune_index, const size_t rune_count);
+char* utf8_remove(char* dest, const size_t rune_index, const size_t rune_count);
