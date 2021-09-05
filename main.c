@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "utf8.h"
+
 #define WIN_WIDTH 640
 #define WIN_HEIGHT 200
 #define USAGE "Usage: %s <font.ttf> [size] [text]\n"
