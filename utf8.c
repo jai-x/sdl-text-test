@@ -20,6 +20,10 @@ utf8_is_rune_start(char ch)
 size_t
 utf8_rune_count(char* str)
 {
+	if (str == NULL) {
+		return 0;
+	}
+
 	int codepoints = 0;
 	size_t len = strlen(str);
 	for (size_t i = 0; i < len; i++) {
@@ -33,6 +37,10 @@ utf8_rune_count(char* str)
 char*
 utf8_append(char* dest, const char* src)
 {
+	if (dest == NULL) {
+		return utf8_from_literal(src);
+	}
+
 	size_t len = strlen(dest) + strlen(src);
 	dest = (char*) realloc(dest, len + 1);
 	return strcat(dest, src);
@@ -121,6 +129,10 @@ utf8_insert(char* dest, const size_t rune_index, const char* src)
 char*
 utf8_remove(char* dest, const size_t rune_index, const size_t rune_count)
 {
+	if (dest == NULL) {
+		return NULL;
+	}
+
 	if (rune_count < 1) {
 		return dest;
 	}
@@ -163,6 +175,12 @@ utf8_remove(char* dest, const size_t rune_index, const size_t rune_count)
 	// free temp variables
 	free(before);
 	free(after);
+
+	// zero length string is useless
+	if (dest[0] == '\0') {
+		free(dest);
+		return NULL;
+	}
 
 	return dest;
 }
