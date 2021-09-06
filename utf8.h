@@ -36,6 +36,11 @@ char* utf8_prepend(char* dest, const char* src);
 size_t utf8_rune_to_byte_index(char* str, size_t rune_index);
 
 /*
+ * Returns a substring of runes from the string start.
+ */
+char* utf8_runes_from_left(char* str, size_t rune_index);
+
+/*
  * Inserts str into dest starting from the given UTF8 rune index.
  * Automatically resizes dest and returns it.
  */

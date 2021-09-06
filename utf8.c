@@ -24,14 +24,14 @@ utf8_rune_count(char* str)
 		return 0;
 	}
 
-	int codepoints = 0;
+	int runes = 0;
 	size_t len = strlen(str);
 	for (size_t i = 0; i < len; i++) {
 		if (utf8_is_rune_start(str[i])) {
-			codepoints++;
+			runes++;
 		}
 	}
-	return codepoints;
+	return runes;
 }
 
 char*
@@ -64,8 +64,12 @@ utf8_prepend(char* dest, const char* src)
 }
 
 size_t
-utf8_rune_to_byte_index(char* str, size_t rune_index)
+utf8_rune_to_byte_index(const char* str, size_t rune_index)
 {
+	if (rune_index == 0 && utf8_is_rune_start(str[0])) {
+		return 0;
+	}
+
 	size_t byte_index = 0;
 	size_t byte_size = strlen(str);
 	size_t current_rune_index = 0;
@@ -85,12 +89,23 @@ utf8_rune_to_byte_index(char* str, size_t rune_index)
 		}
 	}
 
-	return 0;
+	return byte_size;
+}
+
+char*
+utf8_runes_from_left(const char* str, size_t rune_index)
+{
+	size_t byte_index = utf8_rune_to_byte_index(str, rune_index);
+	return strndup(str, byte_index);
 }
 
 char*
 utf8_insert(char* dest, const size_t rune_index, const char* src)
 {
+	if (dest == NULL) {
+		return utf8_from_literal(src);
+	}
+
 	if (rune_index < 1) {
 		return utf8_prepend(dest, src);
 	}
