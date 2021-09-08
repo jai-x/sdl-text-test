@@ -21,20 +21,6 @@ SDL_Color white = { 255, 255, 255, 0 };
 SDL_Color black = {   0,   0,   0, 0 };
 SDL_Color red =   { 255,   0,   0, 0 };
 
-int
-cleanup(int status)
-{
-	if (TTF_WasInit()) {
-		TTF_Quit();
-	}
-
-	if (SDL_WasInit(SDL_INIT_VIDEO)) {
-		SDL_Quit();
-	}
-
-	return status;
-}
-
 void
 SDL_SetRenderDrawColorType(SDL_Renderer* renderer, SDL_Color* color)
 {
@@ -65,7 +51,8 @@ main (int argc, char* argv[])
 	TTF_Font* font = TTF_OpenFont(argv[1], SIZE);
 	if (font == NULL) {
 		SDL_Log("Error loading font %s (%dpt): %s\n", argv[1], SIZE, TTF_GetError());
-		return cleanup(EXIT_FAILURE);
+		TTF_Quit();
+		return EXIT_FAILURE;
 	}
 
 	// Setup font
@@ -97,7 +84,6 @@ main (int argc, char* argv[])
 
 	bool text_valid = false;
 	char *text = NULL;
-	int text_width = 0;
 
 	bool focus_valid = false;
 	bool focus = false;
@@ -121,24 +107,27 @@ main (int argc, char* argv[])
 
 		// --- Begin Inputs ---
 		switch (event.type) {
-			case SDL_QUIT:
+			case SDL_QUIT: {
 				alive = false;
 				break;
+			}
 
-			case SDL_MOUSEBUTTONDOWN:
+			case SDL_MOUSEBUTTONDOWN: {
 				bool new_focus = SDL_PointInRect(&(SDL_Point){ event.button.x, event.button.y }, &textbox);
 				if (new_focus != focus) {
 					focus = new_focus;
 					focus_valid = false;
 				}
 				break;
+			}
 
-			case SDL_KEYDOWN:
+			case SDL_KEYDOWN: {
 				if (event.key.keysym.sym == SDLK_ESCAPE) {
 					if (focus) {
 						focus = false;
 						focus_valid = false;
 					}
+					break;
 				}
 
 				if (event.key.keysym.sym == SDLK_BACKSPACE) {
@@ -148,6 +137,16 @@ main (int argc, char* argv[])
 						text_valid = false;
 						cursor_valid = false;
 					}
+					break;
+				}
+
+				if (event.key.keysym.sym == SDLK_DELETE) {
+					if (focus && cursor_rune_index < utf8_rune_count(text)) {
+						text = utf8_remove(text, cursor_rune_index, 1);
+						text_valid = false;
+						cursor_valid = false;
+					}
+					break;
 				}
 
 				if (event.key.keysym.sym == SDLK_LEFT) {
@@ -155,6 +154,7 @@ main (int argc, char* argv[])
 						cursor_rune_index--;
 						cursor_valid = false;
 					}
+					break;
 				}
 
 				if (event.key.keysym.sym == SDLK_RIGHT) {
@@ -162,6 +162,7 @@ main (int argc, char* argv[])
 						cursor_rune_index++;
 						cursor_valid = false;
 					}
+					break;
 				}
 
 				if (event.key.keysym.sym == SDLK_v && (SDL_GetModState() & KMOD_CTRL)) {
@@ -175,10 +176,12 @@ main (int argc, char* argv[])
 							cursor_valid = false;
 						}
 					}
+					break;
 				}
 				break;
+			}
 
-			case SDL_TEXTINPUT:
+			case SDL_TEXTINPUT: {
 				if (focus) {
 					text = utf8_insert(text, cursor_rune_index, event.text.text);
 					cursor_rune_index += utf8_rune_count(event.text.text);
@@ -187,10 +190,12 @@ main (int argc, char* argv[])
 				}
 				SDL_Log("Text Input Event: %s\n", event.text.text);
 				break;
+			}
 
-			case SDL_TEXTEDITING:
+			case SDL_TEXTEDITING: {
 				SDL_Log("Text Editing Event: %s\n", event.edit.text);
 				break;
+			}
 
 			default:
 				break;
@@ -225,10 +230,7 @@ main (int argc, char* argv[])
 					.w = text_surface->w,
 					.h = text_surface->h,
 				};
-				text_width = text_surface->w;
 				SDL_FreeSurface(text_surface);
-			} else {
-				text_width = 0;
 			}
 
 			text_valid = true;
@@ -270,5 +272,12 @@ main (int argc, char* argv[])
 		// --- End Draw ---
 	}
 
-	return cleanup(EXIT_SUCCESS);
+	free(text);
+	if (text_texture != NULL) {
+		SDL_DestroyTexture(text_texture);
+	}
+	SDL_Quit();
+	TTF_Quit();
+
+	return EXIT_SUCCESS;
 }
