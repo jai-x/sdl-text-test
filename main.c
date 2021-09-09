@@ -80,7 +80,6 @@ process_key(SDL_Keycode code)
 		case SDLK_ESCAPE: {
 			if (focus) {
 				focus = false;
-				cursor_updated = true;
 				stop_text_input();
 			}
 			return;
@@ -150,11 +149,11 @@ void
 draw_text(void)
 {
 	if (text_updated) {
-		if (text_texture != NULL) {
+		if (text_texture) {
 			SDL_DestroyTexture(text_texture);
 		}
 
-		if (text != NULL) {
+		if (text) {
 			// Render text to surface
 			SDL_Surface* text_surface = TTF_RenderUTF8_Solid(font, text, black);
 
@@ -177,7 +176,7 @@ draw_text(void)
 		SDL_Log("Current Text: %s\n", text);
 	}
 
-	if (text_texture != NULL) {
+	if (text_texture) {
 		SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
 	}
 }
@@ -256,6 +255,9 @@ main (int argc, char* argv[])
 				if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
 					window_width = e.window.data1;
 					window_height = e.window.data2;
+
+					text_updated = true;
+					cursor_updated = true;
 				}
 				break;
 			}
@@ -265,8 +267,8 @@ main (int argc, char* argv[])
 				bool new_focus = SDL_PointInRect(&mouse_point, &textbox);
 				if (new_focus != focus) {
 					focus = new_focus;
-					cursor_updated = true;
 					focus ? start_text_input() : stop_text_input();
+					cursor_updated = focus;
 				}
 				break;
 			}
@@ -280,6 +282,7 @@ main (int argc, char* argv[])
 				if (focus) {
 					text = utf8_insert(text, cursor_rune_index, e.text.text);
 					cursor_rune_index += utf8_rune_count(e.text.text);
+
 					text_updated = true;
 					cursor_updated = true;
 				}
