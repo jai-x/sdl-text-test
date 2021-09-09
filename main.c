@@ -64,6 +64,7 @@ main (int argc, char* argv[])
 	// Init SDL
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_CreateWindowAndRenderer(WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN, &window, &renderer);
+	SDL_SetWindowTitle(window, "SDL Text Test");
 
 	SDL_Rect textbox = {
 		.x = (WIN_WIDTH - TEXTBOX_WIDTH) / 2,
