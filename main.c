@@ -1,7 +1,7 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #include "utf8.h"
 
@@ -40,10 +40,6 @@ static bool cursor_updated = true;
 static size_t cursor_rune_index = 0;
 static SDL_Rect cursor_rect = { 0, 0, 1, CURSOR_HEIGHT };
 
-static bool alive = true;
-
-static SDL_Event e = {};
-
 void
 SDL_SetRenderDrawColorType(SDL_Renderer* renderer, const SDL_Color* color)
 {
@@ -74,7 +70,7 @@ stop_text_input(void)
 }
 
 void
-process_key(SDL_Keycode code)
+handle_keydown(SDL_Keycode code)
 {
 	switch (code) {
 		case SDLK_ESCAPE: {
@@ -119,6 +115,56 @@ process_key(SDL_Keycode code)
 			}
 			return;
 		}
+	}
+}
+
+size_t
+get_closest_rune_index(int x)
+{
+	size_t rune_count = utf8_rune_count(text);
+
+	if (rune_count == 0) {
+		return 0;
+	}
+
+	if (x >= (text_rect.x + text_rect.w)) {
+		return rune_count;
+	}
+
+	if (x <= text_rect.x) {
+		return 0;
+	}
+
+	for (size_t i = 0; i < rune_count; i++) {
+		char* txt = utf8_runes_from_left(text, i);
+		int offset = text_draw_width(txt);
+		free(txt);
+
+		if ((text_rect.x + offset) > x) {
+			return i;
+		}
+	}
+
+	return rune_count;
+}
+
+void
+handle_mousedown(SDL_MouseButtonEvent evt)
+{
+	bool new_focus = SDL_PointInRect(&(SDL_Point){ evt.x, evt.y }, &textbox);
+	if (new_focus != focus) {
+		focus = new_focus;
+		if (focus) {
+			start_text_input();
+			cursor_updated = true;
+		} else {
+			stop_text_input();
+		}
+	}
+
+	if (focus) {
+		cursor_rune_index = get_closest_rune_index(evt.x);
+		cursor_updated = true;
 	}
 }
 
@@ -239,6 +285,9 @@ main (int argc, char* argv[])
 	SDL_CreateWindowAndRenderer(window_width, window_height, flags, &window, &renderer);
 	SDL_SetWindowTitle(window, "SDL Text Test");
 
+	bool alive = true;
+	SDL_Event e = {};
+
 	while (SDL_WaitEvent(&e)) {
 		if (!alive) {
 			break;
@@ -263,18 +312,12 @@ main (int argc, char* argv[])
 			}
 
 			case SDL_MOUSEBUTTONDOWN: {
-				SDL_Point mouse_point = { e.button.x, e.button.y };
-				bool new_focus = SDL_PointInRect(&mouse_point, &textbox);
-				if (new_focus != focus) {
-					focus = new_focus;
-					focus ? start_text_input() : stop_text_input();
-					cursor_updated = focus;
-				}
+				handle_mousedown(e.button);
 				break;
 			}
 
 			case SDL_KEYDOWN: {
-				process_key(e.key.keysym.sym);
+				handle_keydown(e.key.keysym.sym);
 				break;
 			}
 
