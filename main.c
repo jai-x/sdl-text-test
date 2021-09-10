@@ -285,6 +285,14 @@ main (int argc, char* argv[])
 	SDL_CreateWindowAndRenderer(window_width, window_height, flags, &window, &renderer);
 	SDL_SetWindowTitle(window, "SDL Text Test");
 
+	SDL_version version;
+
+	SDL_GetVersion(&version);
+	SDL_Log("Using SDL v%d.%d.%d\n", version.major, version.minor, version.patch);
+
+	SDL_TTF_VERSION(&version);
+	SDL_Log("Using SDL_TTF v%d.%d.%d\n", version.major, version.minor, version.patch);
+
 	bool alive = true;
 	SDL_Event e = {};
 
