@@ -1,6 +1,6 @@
 BIN=sdl-text-test
 SRCS=main.c utf8.c
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -std=c99
 LIBS=-lSDL2 -lSDL2_ttf
 
 all:

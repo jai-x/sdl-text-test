@@ -4,10 +4,53 @@
 #include <stdio.h>
 #include <string.h>
 
+// Copied from musl libc
+static char*
+utf8_strdup(const char* str)
+{
+	size_t len = strlen(str);
+	char* dest = malloc(len + 1);
+
+	if (!dest) {
+		return NULL;
+	}
+
+	return memcpy(dest, str, len + 1);
+}
+
+// Copied from musl libc
+static size_t
+utf8_strnlen(const char *s, size_t n)
+{
+	const char *p = memchr(s, 0, n);
+
+	if (p) {
+		return p - s;
+	} else {
+		return n;
+	}
+}
+
+// Copied from musl libc
+static char*
+utf8_strndup(const char* str, size_t n)
+{
+	size_t len = utf8_strnlen(str, n);
+	char* dest = malloc(len + 1);
+
+	if (!dest) {
+		return NULL;
+	}
+
+	memcpy(dest, str, len);
+	dest[len] = '\0';
+	return dest;
+}
+
 char*
 utf8_from_literal(const char* str)
 {
-	return strdup(str);
+	return utf8_strdup(str);
 }
 
 bool
@@ -49,7 +92,7 @@ utf8_append(char* dest, const char* src)
 char*
 utf8_prepend(char* dest, const char* src)
 {
-	char* after = strdup(dest);
+	char* after = utf8_strdup(dest);
 	size_t after_size = strlen(after);
 
 	const char* before = src;
@@ -96,7 +139,7 @@ char*
 utf8_runes_from_left(const char* str, size_t rune_index)
 {
 	size_t byte_index = utf8_rune_to_byte_index(str, rune_index);
-	return strndup(str, byte_index);
+	return utf8_strndup(str, byte_index);
 }
 
 char*
@@ -118,10 +161,10 @@ utf8_insert(char* dest, const size_t rune_index, const char* src)
 	size_t byte_index = utf8_rune_to_byte_index(dest, rune_index);
 
 	// split dest into before and after the byte index point
-	char* before = strndup(dest, byte_index);
+	char* before = utf8_strndup(dest, byte_index);
 	size_t before_size = strlen(before);
 
-	char* after = strdup(dest + byte_index);
+	char* after = utf8_strdup(dest + byte_index);
 	size_t after_size = strlen(after);
 
 	// make the new string the middle
@@ -176,11 +219,11 @@ utf8_remove(char* dest, const size_t rune_index, const size_t rune_count)
 	}
 
 	// take chars before the byte index
-	char* before = strndup(dest, byte_index);
+	char* before = utf8_strndup(dest, byte_index);
 	size_t before_size = strlen(before);
 
 	// take cahrs after the bytes index and the addition bytes to remove
-	char* after = strdup(dest + byte_index + bytes_to_remove);
+	char* after = utf8_strdup(dest + byte_index + bytes_to_remove);
 	size_t after_size = strlen(after);
 
 	// resize and insert
