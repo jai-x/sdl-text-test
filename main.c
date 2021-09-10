@@ -334,7 +334,8 @@ main (int argc, char* argv[])
 			}
 
 			case SDL_TEXTEDITING: {
-				SDL_Log("Text Editing Event: %s\n", e.edit.text);
+				SDL_Log("Text Editing Event: text: %s, timestamp: %d\n", e.edit.text, e.edit.timestamp);
+				// TODO: Handle this to show pre-edit text
 				break;
 			}
 		}
