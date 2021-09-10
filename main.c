@@ -19,7 +19,7 @@
 
 static const SDL_Color white = { 255, 255, 255, 0 };
 static const SDL_Color black = {   0,   0,   0, 0 };
-static const SDL_Color red =   { 255,   0,   0, 0 };
+static const SDL_Color red   = { 255,   0,   0, 0 };
 
 static TTF_Font* font = NULL;
 static SDL_Window* window = NULL;
@@ -284,6 +284,8 @@ main (int argc, char* argv[])
 	int flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
 	SDL_CreateWindowAndRenderer(window_width, window_height, flags, &window, &renderer);
 	SDL_SetWindowTitle(window, "SDL Text Test");
+	// text input is autostarted on desktop but we don't want that
+	SDL_StopTextInput();
 
 	SDL_version version;
 
