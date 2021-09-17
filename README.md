@@ -23,5 +23,8 @@ coverage and looks nice :)
 The source code for this software is licensed under the MIT license.  
 See the `LICENSE` file in this repo for more information.
 
+The file `stb_ds.h` is public domain. See the end of the file for additional
+license information.
+
 The font `Silver.ttf` is copyright of Poppy Works and licensed under the
 Creative Commons Attribution 4.0 International license.
