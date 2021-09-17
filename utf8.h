@@ -9,12 +9,12 @@ char* utf8_from_literal(const char* str);
 /*
  * Returns if a byte is a UTF8 rune or is the start of one.
  */
-bool utf8_is_rune_start(char ch);
+bool utf8_is_rune_start(const char ch);
 
 /*
  * Returns the count of UTF8 runes in the string
  */
-size_t utf8_rune_count(char* str);
+size_t utf8_rune_count(const char* str);
 
 /*
  * Appends the contents of src to dest.

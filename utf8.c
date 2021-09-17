@@ -54,14 +54,14 @@ utf8_from_literal(const char* str)
 }
 
 bool
-utf8_is_rune_start(char ch)
+utf8_is_rune_start(const char ch)
 {
 	//pkg.go.dev/unicode/utf8#RuneStart
 	return (ch & 0xC0) != 0x80;
 }
 
 size_t
-utf8_rune_count(char* str)
+utf8_rune_count(const char* str)
 {
 	if (str == NULL) {
 		return 0;
