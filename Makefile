@@ -1,5 +1,5 @@
 BIN=sdl-text-test
-SRCS=main.c utf8.c
+SRCS=main.c glyph.c
 CFLAGS=-Wall -Wextra -std=c99
 LIBS=-lSDL2 -lSDL2_ttf
 

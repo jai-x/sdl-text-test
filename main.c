@@ -3,7 +3,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-#include "utf8.h"
+#include "glyph.h"
 
 #define USAGE "Usage: %s <font.ttf>\n"
 
@@ -12,14 +12,15 @@
 #define TEXTBOX_WIDTH 590
 #define TEXTBOX_HEIGHT (TEXT_SIZE + 2)
 
-#define TEXTBOX_PADDING_X 10
-#define TEXTBOX_PADDING_Y 5
+#define TEXTBOX_PADDING_X 5
+#define TEXTBOX_PADDING_Y 2
 
 #define CURSOR_HEIGHT (TEXT_SIZE - 7)
 
 static const SDL_Color white = { 255, 255, 255, 0 };
 static const SDL_Color black = {   0,   0,   0, 0 };
 static const SDL_Color red   = { 255,   0,   0, 0 };
+static const SDL_Color gray  = { 128, 128, 128, 0 };
 
 static TTF_Font* font = NULL;
 static SDL_Window* window = NULL;
@@ -32,15 +33,16 @@ static SDL_Rect textbox = { 0, 0, TEXTBOX_WIDTH, TEXTBOX_HEIGHT };
 static bool focus = false;
 
 static bool text_updated = true;
-static char *text = NULL;
+static glyph* text = NULL;
+static glyph* composition = NULL;
 static SDL_Texture* text_texture = NULL;
 static SDL_Rect text_rect = {};
 
 static bool cursor_updated = true;
-static size_t cursor_rune_index = 0;
+static size_t cursor_glyph_index = 0;
 static SDL_Rect cursor_rect = { 0, 0, 1, CURSOR_HEIGHT };
 
-void
+static void
 SDL_SetRenderDrawColorType(SDL_Renderer* renderer, const SDL_Color* color)
 {
 	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->a);
@@ -82,9 +84,9 @@ handle_keydown(SDL_Keycode code)
 		}
 
 		case SDLK_BACKSPACE: {
-			if (focus && cursor_rune_index > 0) {
-				text = utf8_remove(text, cursor_rune_index - 1, 1);
-				cursor_rune_index--;
+			if (focus && cursor_glyph_index > 0) {
+				text = glyph_remove(text, cursor_glyph_index - 1, 1);
+				cursor_glyph_index--;
 				text_updated = true;
 				cursor_updated = true;
 			}
@@ -92,8 +94,8 @@ handle_keydown(SDL_Keycode code)
 		}
 
 		case SDLK_DELETE: {
-			if (focus && cursor_rune_index < utf8_rune_count(text)) {
-				text = utf8_remove(text, cursor_rune_index, 1);
+			if (focus && cursor_glyph_index < glyph_len(text)) {
+				text = glyph_remove(text, cursor_glyph_index, 1);
 				text_updated = true;
 				cursor_updated = true;
 			}
@@ -101,16 +103,16 @@ handle_keydown(SDL_Keycode code)
 		}
 
 		case SDLK_LEFT: {
-			if (focus && cursor_rune_index > 0) {
-				cursor_rune_index--;
+			if (focus && cursor_glyph_index > 0) {
+				cursor_glyph_index--;
 				cursor_updated = true;
 			}
 			return;
 		}
 
 		case SDLK_RIGHT: {
-			if (focus && cursor_rune_index < utf8_rune_count(text)) {
-				cursor_rune_index++;
+			if (focus && cursor_glyph_index < glyph_len(text)) {
+				cursor_glyph_index++;
 				cursor_updated = true;
 			}
 			return;
@@ -119,33 +121,34 @@ handle_keydown(SDL_Keycode code)
 }
 
 size_t
-get_closest_rune_index(int x)
+get_closest_glyph_index(int x)
 {
-	size_t rune_count = utf8_rune_count(text);
+	size_t len = glyph_len(text);
 
-	if (rune_count == 0) {
+	if (len == 0) {
 		return 0;
 	}
 
 	if (x >= (text_rect.x + text_rect.w)) {
-		return rune_count;
+		return len;
 	}
 
 	if (x <= text_rect.x) {
 		return 0;
 	}
 
-	for (size_t i = 0; i < rune_count; i++) {
-		char* txt = utf8_runes_from_left(text, i);
-		int offset = text_draw_width(txt);
-		free(txt);
+	int offset = 0;
+	for (size_t i = 0; i < len; i++) {
+		offset += (text[i].w / 2);
 
-		if ((text_rect.x + offset) > x) {
+		if (x < (text_rect.x + offset)) {
 			return i;
 		}
+
+		offset += (text[i].w / 2);
 	}
 
-	return rune_count;
+	return len;
 }
 
 void
@@ -163,7 +166,7 @@ handle_mousedown(SDL_MouseButtonEvent evt)
 	}
 
 	if (focus) {
-		cursor_rune_index = get_closest_rune_index(evt.x);
+		cursor_glyph_index = get_closest_glyph_index(evt.x);
 		cursor_updated = true;
 	}
 }
@@ -171,7 +174,7 @@ handle_mousedown(SDL_MouseButtonEvent evt)
 void
 draw_textbox(void)
 {
-	// recenter
+	// Recenter
 	textbox.x = (window_width - textbox.w) / 2;
 	textbox.y = (window_height - textbox.h) / 2;
 
@@ -191,35 +194,105 @@ draw_textbox(void)
 	}
 }
 
+static int
+draw_glyph(glyph* g, int x)
+{
+	SDL_Rect glyph_rect = { .x = x, .y = 0, .w = g->w, .h = g->h };
+	SDL_RenderCopy(renderer, g->texture, NULL, &glyph_rect);
+	return x + g->w;
+}
+
 void
 draw_text(void)
 {
+	// Resize based on textbox
+	text_rect = (SDL_Rect){
+		.x = textbox.x + 1 + TEXTBOX_PADDING_X,
+		.y = textbox.y + 1 + TEXTBOX_PADDING_Y,
+		.w = textbox.w - 2 - TEXTBOX_PADDING_X,
+		.h = textbox.h - 2 - TEXTBOX_PADDING_Y,
+	};
+
+	// TODO: Figure out if this works?
+	SDL_SetTextInputRect(&text_rect);
+
 	if (text_updated) {
-		if (text_texture) {
-			SDL_DestroyTexture(text_texture);
-		}
+		size_t text_len = glyph_len(text);
+		size_t composition_len = glyph_len(composition);
 
-		if (text) {
-			// Render text to surface
-			SDL_Surface* text_surface = TTF_RenderUTF8_Solid(font, text, black);
+		// Ensure each glyph in composition has a texture
+		if (composition_len > 0) {
+			for (size_t i = 0; i < composition_len; i++) { 
+				if (!composition[i].texture) {
+					SDL_Surface* glyph_surface = TTF_RenderUTF8_Solid(font, composition[i].utf8, gray);
 
-			// Output to texture
-			text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+					composition[i].texture = SDL_CreateTextureFromSurface(renderer, glyph_surface);
+					composition[i].w = glyph_surface->w;
+					composition[i].h = glyph_surface->h;
 
-			// Create rect of draw position on screen
-			text_rect = (SDL_Rect){
-				.x = textbox.x + TEXTBOX_PADDING_X,
-				.y = textbox.y + TEXTBOX_PADDING_Y,
-				.w = text_surface->w,
-				.h = text_surface->h,
+					SDL_FreeSurface(glyph_surface);
+				}
 			};
-
-			// free surface
-			SDL_FreeSurface(text_surface);
 		}
 
+		// Ensure each glyph in text has a texture
+		if (text_len > 0) {
+			for (size_t i = 0; i < text_len; i++) { 
+				if (!text[i].texture) {
+					SDL_Surface* glyph_surface = TTF_RenderUTF8_Solid(font, text[i].utf8, black);
+
+					text[i].texture = SDL_CreateTextureFromSurface(renderer, glyph_surface);
+					text[i].w = glyph_surface->w;
+					text[i].h = glyph_surface->h;
+
+					SDL_FreeSurface(glyph_surface);
+				}
+			};
+		}
+
+		// Initialise texture it doesn't exist
+		if (!text_texture) {
+			text_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_UNKNOWN, SDL_TEXTUREACCESS_TARGET, text_rect.w, text_rect.h);
+		}
+
+		// Set render target to texture
+		SDL_SetRenderTarget(renderer, text_texture);
+
+		// Clear White
+		SDL_SetRenderDrawColorType(renderer, &white);
+		SDL_RenderClear(renderer);
+
+		int x_offset = 0;
+
+		// Draw text
+		if (text_len > 0) {
+			for (size_t i = 0; i < text_len; i++) {
+				// Draw composition if it is inside or at the beginning of text
+				if (i == cursor_glyph_index && composition_len > 0) {
+					for (size_t c = 0; c < composition_len; c++) {
+						x_offset = draw_glyph(&composition[c], x_offset);
+					}
+				}
+				x_offset = draw_glyph(&text[i], x_offset);
+			}
+		}
+
+		// Draw composition if it is at the end
+		if (cursor_glyph_index == text_len && composition_len > 0) {
+			for (size_t c = 0; c < composition_len; c++) {
+				x_offset = draw_glyph(&composition[c], x_offset);
+			}
+		}
+
+		// Set render target back to window
+		SDL_SetRenderTarget(renderer, NULL);
 		text_updated = false;
-		SDL_Log("Current Text: %s\n", text);
+
+		char* glyph_str = glyph_to_string(text);
+		SDL_Log("Current Text: %s\n", glyph_str);
+		if (glyph_str) {
+			free(glyph_str);
+		}
 	}
 
 	if (text_texture) {
@@ -231,21 +304,22 @@ void
 draw_cursor(void)
 {
 	if (cursor_updated) {
-		cursor_rect.x = textbox.x + TEXTBOX_PADDING_X;
-		cursor_rect.y = textbox.y + TEXTBOX_PADDING_Y;
+		// Recenter
+		cursor_rect.x = text_rect.x;
+		cursor_rect.y = text_rect.y;
 
 		int cursor_offset = 0;
 
-		if (cursor_rune_index != 0) {
-			char* text_before_cursor = utf8_runes_from_left(text, cursor_rune_index);
-			cursor_offset = text_draw_width(text_before_cursor);
-			free(text_before_cursor);
+		if (cursor_glyph_index != 0) {
+			for (size_t i = 0; i < cursor_glyph_index; i++) {
+				cursor_offset += text[i].w;
+			}
 		}
 
 		cursor_rect.x += cursor_offset;
 
 		cursor_updated = false;
-		SDL_Log("Cursor Rune Index: %zu\n", cursor_rune_index);
+		SDL_Log("Cursor Glyph Index: %zu\n", cursor_glyph_index);
 	}
 
 	if (focus) {
@@ -255,7 +329,7 @@ draw_cursor(void)
 }
 
 int
-main (int argc, char* argv[])
+main(int argc, char* argv[])
 {
 	if (argc < 2) {
 		SDL_Log(USAGE, argv[0]);
@@ -284,20 +358,21 @@ main (int argc, char* argv[])
 	int flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
 	SDL_CreateWindowAndRenderer(window_width, window_height, flags, &window, &renderer);
 	SDL_SetWindowTitle(window, "SDL Text Test");
+
 	// text input is autostarted on desktop but we don't want that
 	SDL_StopTextInput();
 
+	// Print versions
 	SDL_version version;
-
 	SDL_GetVersion(&version);
 	SDL_Log("Using SDL v%d.%d.%d\n", version.major, version.minor, version.patch);
-
 	SDL_TTF_VERSION(&version);
 	SDL_Log("Using SDL_TTF v%d.%d.%d\n", version.major, version.minor, version.patch);
 
 	bool alive = true;
 	SDL_Event e = {};
 
+	// Main loop
 	while (SDL_WaitEvent(&e)) {
 		if (!alive) {
 			break;
@@ -333,8 +408,10 @@ main (int argc, char* argv[])
 
 			case SDL_TEXTINPUT: {
 				if (focus) {
-					text = utf8_insert(text, cursor_rune_index, e.text.text);
-					cursor_rune_index += utf8_rune_count(e.text.text);
+					size_t old_len = glyph_len(text);
+					text = glyph_insert(text, cursor_glyph_index, e.text.text);
+					size_t new_len = glyph_len(text);
+					cursor_glyph_index += (new_len - old_len);
 
 					text_updated = true;
 					cursor_updated = true;
@@ -344,8 +421,20 @@ main (int argc, char* argv[])
 			}
 
 			case SDL_TEXTEDITING: {
+				if (focus) {
+					if (composition) {
+						glyph_free(composition);
+						composition = NULL;
+					}
+
+					char* new_comp = e.edit.text;
+					if (new_comp && new_comp[0]) {
+						composition = glyph_insert(composition, 0, new_comp);
+					}
+
+					text_updated = true;
+				}
 				SDL_Log("Text Editing Event: text: %s, start: %d, length: %d timestamp: %d\n", e.edit.text, e.edit.start, e.edit.length, e.edit.timestamp);
-				// TODO: Handle this to show pre-edit text
 				break;
 			}
 		}
@@ -364,7 +453,7 @@ main (int argc, char* argv[])
 	}
 
 	if (text) {
-		free(text);
+		glyph_free(text);
 	}
 
 	if (text_texture) {
